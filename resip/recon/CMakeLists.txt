@@ -181,6 +181,7 @@ install_and_preserve_hierarchy(${CMAKE_INSTALL_INCLUDEDIR}/recon ${INCLUDES})
 # dependency on sipXtapi
 if(USE_SIPXTAPI)
    add_subdirectory(MOHParkServer)
+   add_subdirectory(SIPRecServer)
    if(BUILD_TESTING)
        add_subdirectory(test)
    endif()
