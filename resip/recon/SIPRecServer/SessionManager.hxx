@@ -8,18 +8,45 @@
 #include "../HandleTypes.hxx"
 #include "ConfigParser.hxx"
 
+namespace resip
+{
+   class Contents;
+}
+
 namespace siprecserver
 {
 class Server;
 
-class ParticipantSessionInfo
+class SessionInfo
 {
 public:
-   ParticipantSessionInfo(recon::ParticipantHandle participantHandle, const resip::Uri& heldUri, const resip::Uri& holdingUri) : 
-      mParticipantHandle(participantHandle), mHeldUri(heldUri), mHoldingUri(holdingUri) {} 
+   SessionInfo(
+      recon::ParticipantHandle participantHandle, 
+      recon::ConversationHandle conversationHandle, 
+      const resip::Uri& toUri,
+      const resip::Uri& fromUri,
+      const resip::Data& callId,
+      resip::Contents* metaData) :
+      mParticipantHandle(participantHandle), 
+      mConversationHandle(conversationHandle),
+      mToUri(toUri),
+      mFromUri(fromUri),
+      mCallId(callId)
+   {
+      updateMetaData(metaData);
+   }
+
+   void updateMetaData(resip::Contents* metaData)
+   {
+      mMetaData = std::unique_ptr<resip::Contents>(static_cast<resip::Contents*>(metaData->clone()));
+   }
+
    recon::ParticipantHandle mParticipantHandle;
-   resip::Uri mHeldUri;
-   resip::Uri mHoldingUri;
+   recon::ConversationHandle mConversationHandle;
+   resip::Uri mToUri;
+   resip::Uri mFromUri;
+   resip::Data mCallId;
+   std::unique_ptr<resip::Contents> mMetaData;
 };
 
 class SessionManager
@@ -30,13 +57,13 @@ public:
 
    void startup(ConfigParser::SIPRecSettings& settings);
    void initializeConversationProfile(const resip::NameAddr& uri, const resip::Data& password, unsigned long registrationTime, const resip::NameAddr& outboundProxy);
-   void initializeSettings(const resip::Uri& musicFilename);
+   void initializeSettings(const resip::Data& recordingPath);
 
    void shutdown(bool shuttingDownServer);
 
    bool isMyProfile(recon::ConversationProfile& profile);
-   void addParticipant(recon::ParticipantHandle participantHandle, const resip::Uri& heldUri, const resip::Uri& holdingUri);
-   bool removeParticipant(recon::ParticipantHandle participantHandle);
+   void addNewSession(recon::ParticipantHandle participantHandle, const resip::SipMessage& sipMessage);
+   bool removeSession(recon::ParticipantHandle participantHandle);
    void getActiveCallsInfo(CallInfoList& callInfos);
 
 private:
@@ -44,12 +71,10 @@ private:
    Server& mServer;
    volatile recon::ConversationProfileHandle mConversationProfileHandle;
    resip::NameAddr mSessionUri;  // The main AOR we are registing as 
-   resip::Uri mRecordingLocationUrl;
-   volatile bool mMusicFilenameChanged;
+   resip::Data mRecordPath;
 
-   typedef std::map<recon::ParticipantHandle, ParticipantSessionInfo*> ParticipantMap;
-   typedef std::map<recon::ConversationHandle, ParticipantMap> ConversationMap;
-   ConversationMap mConversations;
+   typedef std::map<recon::ParticipantHandle, SessionInfo*> SessionMap;
+   SessionMap mSessions;
 };
  
 }

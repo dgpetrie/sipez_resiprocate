@@ -11,19 +11,19 @@ namespace siprecserver
 class ActiveCallInfo
 {
 public:
-    ActiveCallInfo(const resip::Uri& heldUri, 
-                   const resip::Uri& invokingUri, 
-                   const resip::Data& holdType, 
-                   unsigned int participantId, 
-                   unsigned int conversationId) :
-      mHeldUri(heldUri),
-      mInvokingUri(invokingUri),
-      mHoldType(holdType),
+   ActiveCallInfo(const resip::Uri& toUri,
+      const resip::Uri& fromUri,
+      const resip::Data& callId,
+      unsigned int participantId,
+      unsigned int conversationId) :
+      mToUri(toUri),
+      mFromUri(fromUri),
+      mCallId(callId),
       mParticipantId(participantId),
       mConversationId(conversationId) {}
-    resip::Uri mHeldUri;
-    resip::Uri mInvokingUri;
-    resip::Data mHoldType;
+    resip::Uri mToUri;
+    resip::Uri mFromUri;
+    resip::Data mCallId;
     unsigned int mParticipantId;
     unsigned int mConversationId;
 };

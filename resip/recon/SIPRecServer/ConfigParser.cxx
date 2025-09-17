@@ -208,9 +208,9 @@ ConfigParser::processOption(const Data& name, const Data& value)
       {
          result = assignNameAddr(name, value, mSIPRecSettingsMap[settingIndex].mOutboundProxy);
       }
-      else if (subToken == "recordlocation")
+      else if (subToken == "recordpath")
       {
-         result = assignRecordUrl(name, value, mSIPRecSettingsMap[settingIndex].mRecordingLocation);
+         mSIPRecSettingsMap[settingIndex].mRecordPath = value;
       }
    }
    else if(name == "a" || name == "ipaddress")
@@ -323,34 +323,6 @@ ConfigParser::assignNameAddr(const Data& settingName, const Data& settingValue, 
          return false;
       }
    }
-   return true;
-}
-
-bool ConfigParser::assignRecordUrl(const resip::Data& settingName, const resip::Data& settingValue, resip::Uri& url)
-{
-   Data urlData;
-   if (settingValue.find("http://") != Data::npos ||
-      settingValue.find("file:") != Data::npos)
-   {
-      // URL was specified - add repeat parameter
-      urlData = settingValue + ";repeat";
-   }
-   else
-   {
-      urlData = "file:" + settingValue + ";repeat";
-   }
-   try
-   {
-      Uri temp(urlData);
-      url = temp;
-   }
-   catch (BaseException& e)
-   {
-      cerr << "Invalid " << settingName << " Uri format=" << settingValue << ": " << e << endl;
-      cerr << "Using " << url << " instead." << endl;
-      url = Uri("file:music.wav;repeat");
-   }
-
    return true;
 }
 

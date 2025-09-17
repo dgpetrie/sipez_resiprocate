@@ -16,7 +16,6 @@ public:
    ConfigParser();  // If you use this constructor you must manually set all configuration values
    virtual ~ConfigParser();
    
-   // TODO SLG - Does SIPRec server need to register?  If not - we don't need these SIPRecSettings
    class SIPRecSettings
    {
    public:
@@ -25,7 +24,7 @@ public:
       resip::Data mPassword;
       unsigned long mRegistrationTime;
       resip::NameAddr mOutboundProxy;
-      resip::Uri mRecordingLocation;
+      resip::Data mRecordPath;
    };
    typedef std::map<unsigned long , SIPRecSettings> SIPRecSettingsMap;
    SIPRecSettingsMap mSIPRecSettingsMap;
@@ -60,7 +59,6 @@ private:
    void parseConfigFile(const resip::Data& filename);
    bool processOption(const resip::Data& name, const resip::Data& value);
    bool assignNameAddr(const resip::Data& settingName, const resip::Data& settingValue, resip::NameAddr& nameAddr);
-   bool assignRecordUrl(const resip::Data& settingName, const resip::Data& settingValue, resip::Uri& url);
 };
  
 }

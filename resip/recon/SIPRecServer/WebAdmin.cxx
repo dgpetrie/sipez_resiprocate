@@ -197,9 +197,9 @@ WebAdmin::buildActiveCallsSubPage(DataStream& s)
       "<table border=\"1\" cellspacing=\"2\" cellpadding=\"0\" align=\"left\">" << endl << 
 
       "<tr>" << endl << 
-      "  <td>Held URI</td>" << endl << 
-      "  <td>Invoking URI</td>" << endl << 
-      "  <td>Hold Type</td>" << endl << 
+      "  <td>To URI</td>" << endl << 
+      "  <td>From URI</td>" << endl << 
+      "  <td>Call ID</td>" << endl << 
       "  <td>Participant ID</td>" << endl << 
       "  <td>Conversation ID</td>" << endl << 
       //"  <td><input type=\"submit\" value=\"Remove\"/></td>" << endl <<   // TODO
@@ -210,9 +210,9 @@ WebAdmin::buildActiveCallsSubPage(DataStream& s)
    for (CallInfoList::iterator it = callInfos.begin(); it != callInfos.end(); ++it )
    {
       s << "<tr>" << endl
-        << "  <td>" << it->mHeldUri << "</td>" << endl
-        << "  <td>" << it->mInvokingUri << "</td>" << endl
-        << "  <td>" << it->mHoldType << "</td>" << endl
+        << "  <td>" << it->mToUri << "</td>" << endl
+        << "  <td>" << it->mFromUri << "</td>" << endl
+        << "  <td>" << it->mCallId << "</td>" << endl
         << "  <td>" << it->mParticipantId << "</td>" << endl
         << "  <td>" << it->mConversationId << "</td>" << endl
         //<< "  <td><input type=\"checkbox\" name=\"remove." << it->mHeldUri << "\" value=\"" << it->mParticipantId << "\"/></td>" << endl  // TODO

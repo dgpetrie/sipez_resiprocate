@@ -454,7 +454,7 @@ Server::onParticipantDestroyed(ParticipantHandle partHandle)
    SessionManagerMap::iterator it = mSessionManagerMap.begin();
    for (; it != mSessionManagerMap.end(); it++)
    {
-      if (it->second->removeParticipant(partHandle))
+      if (it->second->removeSession(partHandle))
       {
          return;
       }
@@ -478,7 +478,7 @@ Server::onIncomingParticipant(ParticipantHandle partHandle, const SipMessage& ms
    {
       if (it->second->isMyProfile(conversationProfile))
       {
-         it->second->addParticipant(partHandle, msg.header(h_From).uri(), msg.header(h_From).uri());
+         it->second->addNewSession(partHandle, msg);
          return;
       }
    }
@@ -487,23 +487,14 @@ Server::onIncomingParticipant(ParticipantHandle partHandle, const SipMessage& ms
    rejectParticipant(partHandle, 404);
 }
 
+// Incoming REFER handling
 void 
 Server::onRequestOutgoingParticipant(ParticipantHandle partHandle, const SipMessage& msg, ConversationProfile& conversationProfile)
 {
    InfoLog(<< "onRequestOutgoingParticipant: handle=" << partHandle << " msg=" << msg.brief());
 
-   // Try each manager until conversationProfile is found
-   SessionManagerMap::iterator it = mSessionManagerMap.begin();
-   for (; it != mSessionManagerMap.end(); it++)
-   {
-      if (it->second->isMyProfile(conversationProfile))
-      {
-         it->second->addParticipant(partHandle, msg.header(h_ReferTo).uri().getAorAsUri(), msg.header(h_From).uri());
-         return;
-      }
-   }
-   // Not found anywhere - reject with a 404
-   rejectParticipant(partHandle, 404);
+   // Not supported - reject with a 405 (Method Not Allowed)
+   rejectParticipant(partHandle, 405);
 }
     
 void 

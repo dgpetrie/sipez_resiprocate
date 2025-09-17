@@ -4,6 +4,7 @@
 #include "Server.hxx"
 
 #include <resip/stack/ExtensionParameter.hxx>
+#include <resip/stack/Contents.hxx>
 #include <rutil/Log.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/WinLeakCheck.hxx>
@@ -25,8 +26,7 @@ namespace siprecserver
 
 SessionManager::SessionManager(Server& server) :
    mServer(server),
-   mConversationProfileHandle(0),
-   mMusicFilenameChanged(false)
+   mConversationProfileHandle(0)
 {
 }
 
@@ -38,20 +38,14 @@ void
 SessionManager::startup(ConfigParser::SIPRecSettings& settings)
 {
    // Initialize settings
-   initializeSettings(settings.mRecordingLocation);
+   initializeSettings(settings.mRecordPath);
 
    // Setup ConversationProfile - If session setting specific outbound proxy is not specified, then use global 
    // outbound proxy setting.
    initializeConversationProfile(settings.mUri, settings.mPassword, settings.mRegistrationTime, 
       !settings.mOutboundProxy.uri().host().empty() ? settings.mOutboundProxy : mServer.mConfig.mOutboundProxy);
 
-   // Create an initial conversation and start music
-   ConversationHandle convHandle = mServer.createConversation(ConversationManager::AutoHoldBroadcastOnly);
-   //mServer.createMediaResourceParticipant(convHandle, settings.mMOHFilenameUrl);  // Play Music
-   mConversations[convHandle];
-   mMusicFilenameChanged = false;
-
-   InfoLog(SIPRECLOG_PREFIX << "startup: RecordingLocationUrl=" << settings.mRecordingLocation);
+   InfoLog(SIPRECLOG_PREFIX << "startup: RecordPath=" << settings.mRecordPath);
 }
 
 void 
@@ -75,11 +69,12 @@ SessionManager::initializeConversationProfile(const NameAddr& uri, const Data& p
    }
    conversationProfile->challengeOODReferRequests() = false;
    conversationProfile->setExtraHeadersInReferNotifySipFragEnabled(true);  // Enable dialog identifying headers in SipFrag bodies of Refer Notifies - required for a music on hold server
-   NameAddr capabilities;
-   capabilities.param(p_automaton);
-   capabilities.param(p_byeless);
-   capabilities.param(p_rendering) = "\"no\"";
-   conversationProfile->setUserAgentCapabilities(capabilities);
+   // TODO SLG - need anything here for SIPRec? If not, delete these lines
+   //NameAddr capabilities;
+   //capabilities.param(p_automaton);
+   //capabilities.param(p_byeless);
+   //capabilities.param(p_rendering) = "\"no\"";
+   //conversationProfile->setUserAgentCapabilities(capabilities);
    conversationProfile->natTraversalMode() = ConversationProfile::NoNatTraversal;
    conversationProfile->secureMediaMode() = ConversationProfile::NoSecureMedia;
    mServer.buildSessionCapabilities(conversationProfile->sessionCaps());
@@ -88,47 +83,25 @@ SessionManager::initializeConversationProfile(const NameAddr& uri, const Data& p
 }
 
 void 
-SessionManager::initializeSettings(const resip::Uri& recordingLocationUrl)
+SessionManager::initializeSettings(const resip::Data& recordPath)
 {
    Lock lock(mMutex);
-   mRecordingLocationUrl = recordingLocationUrl;
-   // If there is a single conversation with no participants, then there are no 
-   // current parties on hold - re-create the conversation with new music
-   if(mConversations.size() == 1 && mConversations.begin()->second.size() == 0)
-   {
-      mServer.destroyConversation(mConversations.begin()->first);
-      mConversations.clear();
-
-      // re-create an initial conversation and start music
-      ConversationHandle convHandle = mServer.createConversation(ConversationManager::AutoHoldBroadcastOnly);
-      //mServer.createMediaResourceParticipant(convHandle, mMusicFilename);  // Play Music
-      mConversations[convHandle];
-   }
-   else
-   {
-      mMusicFilenameChanged = true;
-   }
+   mRecordPath = recordPath;
 }
 
 void
 SessionManager::shutdown(bool shuttingDownServer)
 {
    Lock lock(mMutex);
-   // Destroy all conversations
-   ConversationMap::iterator it = mConversations.begin();
-   for (; it != mConversations.end(); it++)
+   // Destroy all sessions
+   SessionMap::iterator it = mSessions.begin();
+   for (; it != mSessions.end(); it++)
    {
-      // Clean up participant memory
-      ParticipantMap::iterator partIt = it->second.begin();
-      for (; partIt != it->second.end(); partIt++)
-      {
-         delete partIt->second;
-      }
-      it->second.clear();
-
-      mServer.destroyConversation(it->first);
+      // Destory the conversation and it will destroy all participants
+      mServer.destroyConversation(it->second->mConversationHandle);
+      delete it->second;
    }
-   mConversations.clear();
+   mSessions.clear();
 
    // If shutting down server, then we shouldn't remove the conversation profiles here
    // shutting down the ConversationManager will take care of this.  We need to be sure
@@ -150,88 +123,103 @@ SessionManager::isMyProfile(recon::ConversationProfile& profile)
 }
 
 void 
-SessionManager::addParticipant(ParticipantHandle participantHandle, const Uri& heldUri, const Uri& holdingUri)
+SessionManager::addNewSession(recon::ParticipantHandle participantHandle, const resip::SipMessage& sipMessage)
 {
    Lock lock(mMutex);
-   ConversationHandle conversationToUse = 0;
-   // Check if we have an existing conversation with room to add this party
-   ConversationMap::iterator it = mConversations.begin();
-   for(; it != mConversations.end(); it++)
+
+   resip::Data callId = sipMessage.header(h_CallId).value();
+   resip::Data recordFilename;
    {
-      if(it->second.size() < DEFAULT_BRIDGE_MAX_IN_OUTPUTS-3)
-      {
-         // Found an existing conversation with room - add the participant here
-         conversationToUse = it->first;
-         break;
-      }
+      resip::DataStream ds(recordFilename);
+      ds << mRecordPath << "/recording-" << callId << ".wav";
    }
 
-   // No conversation found that we can use - create a new one
-   if(!conversationToUse)
+   // Create a new Conversation for this call/session
+   recon::ConversationHandle conversationHandle = mServer.createConversation(ConversationManager::AutoHoldEnabled);
+   InfoLog(SIPRECLOG_PREFIX << "addNewSession: created new conversation for SIPREc session, handle=" << conversationHandle << ", recordFilename=" << recordFilename);
+
+   resip_assert(conversationHandle);
+
+   // Add this new inbound participant/call to the newly created conversation
+   mServer.addParticipant(conversationHandle, participantHandle);
+
+   // Add a recorder to conversation
+   /** 
+     Note:  This is a subset of the recon docs for createMediaResourceParticipant - the information 
+            relevant to recording only.
+
+     record:<filepath> - Single channel recorder.  If filename only, then writes to
+                         application directory. Use | instead of : for drive specifier.
+                         ;append parameter specifies to append to an existing recording
+     record:circularbuffer - Single channel recorded audio is written to provided media
+                         specific CircularBuffer
+     record-mc:<filepath> - Multichannel recorder. If filename only, then writes to application
+                         directory.  Use | instead of : for drive specifier.
+                         ;append parameter specifies to append to an existing recording
+                         ;numchannels parameter specifies either 1 or 2 channels of recording
+     record-mc:circularbuffer - Multichannel recorded audio is written to provided media
+                         specific CircularBuffer.
+                         ;numchannels parameter specifies either 1 or 2 channels of recording
+     buffer:<type> - For sipXtapi the only allowed type is RAW_PCM_16, the sampling rate
+                         is expected to be 8khz.
+
+     other optional parameters are: [;duration=<milliseconds>][;repeat][silencetime=<milliseconds>][;format=<recording_format>][;startoffset=<milliseconds>]
+        - 'duration' specifies max recording length in Ms
+        - 'silencetime' parameter specifies ms of silence to end recording
+        - 'format' Possible values: WAV_PCM16, WAV_MULAW, WAV_ALAW, WAV_GSM, OGG_OPUS
+
+     Sample mediaUrls:
+        record:recording.wav             - records all participants audio mixed together in a WAV file of type WAV_PCM16, must be manually destroyed
+        record:recording.ogg;format=OGG_OPUS - records all participants audio mixed together in an Opus encoded OGG file, must be manually destroyed
+        record:recording.wav;duration=30000;silencetime=5000 - records all participants audio mixed togehter in a WAV file, for up to 5 mins, stop
+                                                               automatically when voice is missing for 5 seconds
+        record:circularbuffer;format=WAV_PCM16 - records all participants audio mixed together as PCM16 in the provided ciruclar buffer (no WAV header
+                                                 is generated). Must be manually destroyed.
+        record-mc:circularbuffer;format=WAV_PCM16;numchannels=2 - records all parties in the left channel unless they have channel 2 recording enabled
+                                                 via the modifyParticipantRecordChannel API, then they are mixed into the right channel.  Use PCM16
+                                                 format and output to the provided ciruclar buffer (no WAV header is generated).  Must be manually destroyed.
+        buffer:RAW_PCM_16;repeat         - plays the audio from the provided playAudioBuffer parameter, repeating when complete until participant is destroyed
+
+     @param convHandle - Handle of the conversation to create the MediaParticipant in
+     @param mediaUrl - Controls what type of media participant to add
+     @param playAudioBuffer - not used for recording
+     @param recordingCircularBuffer - a pointer to media stack specific circular buffer implementation to pass to the recorder.  Audio can be read from
+                                      the circular buffer as it is being recorded.  For sipXtapi, this implementation is of type utl\CircularBufferPtr.h
+
+     @return A handle to the newly created media participant
+   */
+   resip::Data mediaUri;
    {
-      conversationToUse = mServer.createConversation(ConversationManager::AutoHoldBroadcastOnly);
-      InfoLog(SIPRECLOG_PREFIX << "addParticipant: created new conversation for music on hold, id=" << conversationToUse);
-
-      // Play Music
-      //mServer.createMediaResourceParticipant(conversationToUse, mMusicFilename);
+      resip::DataStream ds(mediaUri);
+      ds << "record-mc:" << recordFilename << ";format=WAV_PCM16;numchannels=2";
    }
-   else
-   {
-       InfoLog(SIPRECLOG_PREFIX << "addParticipant: using existing conversation for music on hold, id=" << conversationToUse);
-   }
+   mServer.createMediaResourceParticipant(conversationHandle, resip::Uri(mediaUri));
 
-   resip_assert(conversationToUse);
-
-   mServer.addParticipant(conversationToUse, participantHandle);
-   mServer.modifyParticipantContribution(conversationToUse, participantHandle, 100, 0 /* Mute participant */);
+   // Answer the call (SIP 200/INVITE)
    mServer.answerParticipant(participantHandle);
-   mConversations[conversationToUse].insert(std::make_pair(participantHandle, new ParticipantSessionInfo(participantHandle, heldUri, holdingUri)));
+
+   // Create new SessionInfo and add to map
+   SessionInfo* sessionInfo = new SessionInfo(
+      participantHandle, 
+      conversationHandle,
+      sipMessage.header(h_To).uri(),
+      sipMessage.header(h_From).uri(),
+      sipMessage.header(h_CallId).value(),
+      sipMessage.getContents());
+   mSessions.insert(std::make_pair(participantHandle, sessionInfo));
 }
 
 bool
-SessionManager::removeParticipant(ParticipantHandle participantHandle)
+SessionManager::removeSession(ParticipantHandle participantHandle)
 {
    Lock lock(mMutex);
-   // Find Conversation that participant is in
-   ConversationMap::iterator it = mConversations.begin();
-   for(; it != mConversations.end(); it++)
+   // Find the session
+   SessionMap::iterator it = mSessions.find(participantHandle);
+   if (it != mSessions.end())
    {
-      ParticipantMap::iterator partIt = it->second.find(participantHandle);
-      if(partIt != it->second.end())
-      {
-         InfoLog(SIPRECLOG_PREFIX << "removeParticipant: found in conversation id=" << it->first << ", size=" << it->second.size());
-
-         // Found! Remove from conversation
-         delete partIt->second;
-         it->second.erase(partIt);
-
-         // Check if conversation is now empty, and it's not the last conversation
-         if(it->second.size() == 0)
-         {    
-            if(mConversations.size() > 1)
-            {
-               // Destroy conversation (and containing media participant)
-               mServer.destroyConversation(it->first);
-
-               // Remove Conversation from Map
-               mConversations.erase(it);
-
-               InfoLog(SIPRECLOG_PREFIX << "removeParticipant: last participant in conversation, destroying conversation, num conversations now=" << mConversations.size());
-            }
-            else if(mConversations.size() == 1 && mMusicFilenameChanged)  // If the initial conversation is empty, and the music filename setting changed, then restart it
-            {
-               mServer.destroyConversation(mConversations.begin()->first);
-               mConversations.clear();
-
-               // re-create an initial conversation and start music
-               ConversationHandle convHandle = mServer.createConversation(ConversationManager::AutoHoldBroadcastOnly);
-               //mServer.createMediaResourceParticipant(convHandle, mMusicFilename);  // Play Music
-               mConversations[convHandle];
-               mMusicFilenameChanged = false;
-            }
-         }
-         return true;
-      }
+      mServer.destroyConversation(it->second->mConversationHandle);
+      mSessions.erase(it);
+      return true;
    }
    return false;
 }
@@ -240,15 +228,11 @@ void
 SessionManager::getActiveCallsInfo(CallInfoList& callInfos)
 {
    Lock lock(mMutex);
-   // Find Conversation that participant is in
-   ConversationMap::iterator it = mConversations.begin();
-   for(; it != mConversations.end(); it++)
+   SessionMap::iterator it = mSessions.begin();
+   for(; it != mSessions.end(); it++)
    {
-      ParticipantMap::iterator partIt = it->second.begin();
-      for(; partIt != it->second.end(); partIt++)
-      {
-         callInfos.push_back(ActiveCallInfo(partIt->second->mHeldUri, partIt->second->mHoldingUri, "MOH", partIt->first, it->first));
-      }
+      // TODO TEMP
+      callInfos.push_back(ActiveCallInfo(it->second->mToUri, it->second->mFromUri, it->second->mCallId, it->second->mParticipantHandle, it->second->mConversationHandle));
    }
 }
 
