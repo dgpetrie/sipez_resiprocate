@@ -136,6 +136,7 @@ Server::Server(ConfigParser& config) :
    }
    InfoLog( << "  Local IP Address = " << mConfig.mAddress);
    InfoLog( << "  Override DNS Servers = " << mConfig.mDnsServers);
+   InfoLog( << "  HTTP Port = " << mConfig.mHttpPort);
    InfoLog( << "  UDP Port = " << mConfig.mUdpPort);
    InfoLog( << "  TCP Port = " << mConfig.mTcpPort);
    InfoLog( << "  TLS Port = " << mConfig.mTlsPort);
