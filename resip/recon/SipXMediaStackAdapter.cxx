@@ -93,6 +93,10 @@ SipXMediaStackAdapter::SipXMediaStackAdapter(ConversationManager& conversationMa
 void
 SipXMediaStackAdapter::init(int defaultSampleRate, int maxSampleRate)
 {
+#ifndef SIPX_CODEC_DIR
+  #error lib dir not set
+  #define SIPX_CODEC_DIR "/usr/local/share/sipxmedialib"
+#endif
 #ifdef _DEBUG
 
   #if _WIN64
@@ -101,7 +105,7 @@ SipXMediaStackAdapter::init(int defaultSampleRate, int maxSampleRate)
     #if _WIN32
       UtlString codecPaths[] = { ".", getExecutableDir().c_str(), "../../../Win32/Debug" };
     #else
-      UtlString codecPaths[] = { "." };
+      UtlString codecPaths[] = { ".", SIPX_CODEC_DIR };
     #endif
   #endif
 
@@ -113,7 +117,7 @@ SipXMediaStackAdapter::init(int defaultSampleRate, int maxSampleRate)
     #if _WIN32
       UtlString codecPaths[] = { ".", getExecutableDir().c_str(), "../../../Win32/Release" };
     #else
-      UtlString codecPaths[] = { "." };
+      UtlString codecPaths[] = { ".", SIPX_CODEC_DIR };
     #endif
   #endif
 
