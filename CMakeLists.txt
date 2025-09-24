@@ -798,10 +798,42 @@ if(USE_SIPXTAPI)
         add_sipx_msproject(plgspeex-proj sipXmediaLib/src/mp/codecs/plgspeex/plgspeex-msvc17.vcxproj sipXtapi/CodecPlugins)
         add_sipx_msproject(plgtones-proj sipXmediaLib/src/mp/codecs/plgtones/plgtones-msvc17.vcxproj sipXtapi/CodecPlugins)
       endif()
+
+   # Linux
    else()
-      find_package(sipXtapi REQUIRED)
-      set(SIPX_NO_RECORD true)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__pingtel_on_posix__")
+    function(add_sipx_lib)
+      add_library(${ARGV0} SHARED IMPORTED GLOBAL)
+      find_library(${sipXmedia_LIBRARIES} ${ARGV0})
+      set_target_properties(${ARGV0} PROPERTIES
+          IMPORTED_LOCATION ${sipXmedia_LIBRARIES}/lib${ARGV0}.so
+        )
+
+      #add_dependencies(${ARGV0} sipXtapi)
+      set(SIPXTAPI_LIBRARIES ${SIPXTAPI_LIBRARIES} ${ARGV0} PARENT_SCOPE)
+    endfunction()
+
+    #find_package(sipXtapi REQUIRED)
+    set(SIPX_NO_RECORD true)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__pingtel_on_posix__")
+
+    # Setup libraries
+    #add_sipx_lib(sipXtapi-pcre pcre)
+    add_sipx_lib(sipXport)
+    add_sipx_lib(sipXsdp)
+    add_sipx_lib(sipXmedia)
+    add_sipx_lib(sipXmediaProcessing)
+    add_sipx_lib(speexdsp)
+    #add_sipx_lib(opusenc opusenc)
+    #add_sipx_lib(opus opus)
+    #add_sipx_lib(opusfile opusfile -NoHTTP)
+    #add_sipx_lib(libogg libogg)
+    message(STATUS "in Top SIPXTAPI_LIBRARIES value: ${SIPXTAPI_LIBRARIES}")
+
+    # Setup include dirs
+    set(SIPXTAPI_INCLUDE_DIRS 
+        "${SIPXTAPI_INCLUDE_DIR}"
+      )
+
    endif()
 endif()
 

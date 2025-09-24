@@ -57,6 +57,14 @@ if(WIN32)
       COMMAND_EXPAND_LISTS
     )
   endif()
+
+# Linux
+else()
+  if(USE_SIPXTAPI)
+    message(STATUS "in MOH SIPXTAPI_LIBRARIES value: ${SIPXTAPI_LIBRARIES}")
+    target_link_libraries(MOHParkServer PRIVATE ${SIPXTAPI_LIBRARIES})
+  endif()
+
 endif()
 
 install(TARGETS MOHParkServer DESTINATION ${CMAKE_INSTALL_SBINDIR})
