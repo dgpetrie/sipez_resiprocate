@@ -9,6 +9,7 @@
 /RFC4475TortureTests
 /UAS
 /dumpTls
+/fuzzStack
 /limpc
 /makeSelfCert
 /test503Generator
@@ -59,6 +60,7 @@
 /testTimer
 /testTls
 /testTransactionFSM
+/testTransportSelector
 /testTuple
 /testTypedef
 /testUdp

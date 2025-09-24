@@ -3,4 +3,11 @@
 /Makefile
 /.deps
 /.libs
+/music.h.0
+/music.raw
+/playback_prompt.h.0
+/playback_prompt.raw
+/prompt2wav
+/record_prompt.h.0
+/record_prompt.raw
 

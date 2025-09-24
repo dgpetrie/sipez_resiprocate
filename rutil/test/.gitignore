@@ -8,8 +8,10 @@
 
 /*.log
 /*.trs
+/fuzzUtil
 /testLogger*.txt
 /testCoders
+/testCondition
 /testCompat
 /testConfigParse
 /testCountStream
@@ -21,6 +23,7 @@
 /testFileSystem
 /testInserter
 /testIntrusiveList
+/testKeyValueStore
 /testLogger
 /testMD5Stream
 /testNetNs
@@ -30,3 +33,4 @@
 /testSHA1Stream
 /testThreadIf
 /testXMLCursor
+

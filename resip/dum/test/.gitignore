@@ -12,9 +12,12 @@ basicClient
 basicMessage
 basicRegister
 limpc
+limpc-dum
 setldpath.sh
 testContactInstanceRecord
+testDialogSetId
 testPubDocument
+testRedirectManager
 testRequestValidationHandler
 testSMIMEInvite
 testSMIMEMessage

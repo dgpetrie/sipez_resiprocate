@@ -12,6 +12,7 @@
 *.idb
 *.log
 *.cache
+*.swp
 /Makefile
 /Makefile.in
 /.deps
