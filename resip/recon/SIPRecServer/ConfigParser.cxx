@@ -39,7 +39,7 @@ ConfigParser::ConfigParser(int argc, char** argv) :
    //mAddress = DnsUtil::getLocalIpAddress();
 
    // Parse config file first
-   parseConfigFile("siprecserver.config");
+   parseConfigFile("SIPRecServer.config");
 
    // Parse command line options
    // Note:  command line overrides config file setting
